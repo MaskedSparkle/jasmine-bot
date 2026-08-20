@@ -7,9 +7,27 @@ class Jasmine(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
+        intents.moderation = True  # Szükséges a kitiltások (bans) ellenőrzéséhez
         super().__init__(command_prefix='!', intents=intents)
 
     async def on_member_join(self, member):
+        # Ellenőrizzük, hogy a tag ki van-e tiltva (bannolva)
+        try:
+            async for entry in member.guild.audit_logs(limit=5, action=discord.AuditLogAction.ban):
+                if entry.target.id == member.id:
+                    # Ha friss ban van érvényben, csendben kilépünk (nem köszönjük meg)
+                    return
+        except discord.Forbidden:
+            pass
+        
+        # Másodlagos biztonság: lekérdezzük a szerver tiltásait is
+        try:
+            bans = [ban_entry.user.id async for ban_entry in member.guild.bans()]
+            if member.id in bans:
+                return
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
         # 1. Nyilvános köszöntő üzenet a szerveren
         channel = self.get_channel(1539791346880221196) 
         if channel:
@@ -36,7 +54,7 @@ class Jasmine(commands.Bot):
         try:
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
-                description=f"Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy csak elakadsz, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
+                description=f"Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy szeretsz elakadni, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
                 color=discord.Color.pink()
             )
             dm_embed.set_footer(text="Szeretettel: Jasmine 🐾")
