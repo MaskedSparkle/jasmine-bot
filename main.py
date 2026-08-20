@@ -7,28 +7,45 @@ class Jasmine(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        intents.moderation = True  # Szükséges a kitiltások (bans) ellenőrzéséhez
+        intents.moderation = True  # Szükséges a kitiltások ellenőrzéséhez
         super().__init__(command_prefix='!', intents=intents)
 
     async def on_member_join(self, member):
-        # Ellenőrizzük, hogy a tag ki van-e tiltva (bannolva)
+        is_banned = False
+        
+        # 1. Ellenőrizzük, hogy ki van-e tiltva (bannolva)
         try:
             async for entry in member.guild.audit_logs(limit=5, action=discord.AuditLogAction.ban):
                 if entry.target.id == member.id:
-                    # Ha friss ban van érvényben, csendben kilépünk (nem köszönjük meg)
-                    return
+                    is_banned = True
+                    break
         except discord.Forbidden:
             pass
         
-        # Másodlagos biztonság: lekérdezzük a szerver tiltásait is
-        try:
-            bans = [ban_entry.user.id async for ban_entry in member.guild.bans()]
-            if member.id in bans:
-                return
-        except (discord.Forbidden, discord.HTTPException):
-            pass
+        if not is_banned:
+            try:
+                bans = [ban_entry.user.id async for ban_entry in member.guild.bans()]
+                if member.id in bans:
+                    is_banned = True
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
-        # 1. Nyilvános köszöntő üzenet a szerveren
+        # Ha ki van bannolva, Jasmine elküldi a DM-et, és megállítjuk a folyamatot
+        if is_banned:
+            try:
+                ban_embed = discord.Embed(
+                    title="🚫 Sajnálom, de nem tudsz belépni!",
+                    description=f"Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak. Vagy a hugom, Kamila bannolt, vagy valamelyik staff, esetleg a tulajdonos.\n\nHa a tulaj úgy gondolja, akkor unbannol téged, de én nem tudlak, mert én csak egy bot vagyok, semmi más! 🌸",
+                    color=discord.Color.red()
+                )
+                ban_embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
+                await member.send(embed=ban_embed)
+            except discord.Forbidden:
+                # Ha le vannak tiltva a DM-ek, csendben átugorjuk
+                pass
+            return
+
+        # 2. Normál, sikeres belépés (ha NINCS bannolva)
         channel = self.get_channel(1539791346880221196) 
         if channel:
             member_count = member.guild.member_count
@@ -50,18 +67,17 @@ class Jasmine(commands.Bot):
             
             await channel.send(embed=embed)
 
-        # 2. Privát (DM) üzenet küldése az új tagnak
+        # Privát (DM) üzenet a normális tagoknak
         try:
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
-                description=f"Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy szeretsz elakadni, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
+                description=f"Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy elakadsz, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
                 color=discord.Color.pink()
             )
             dm_embed.set_footer(text="Szeretettel: Jasmine 🐾")
             
             await member.send(embed=dm_embed)
         except discord.Forbidden:
-            # Ha a tagnak le vannak tiltva a DM-ek, a bot csendben átugorja
             pass
 
     async def on_member_remove(self, member):
