@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import datetime
+import os
 
 class Jasmine(commands.Bot):
     def __init__(self):
@@ -98,4 +99,5 @@ class Jasmine(commands.Bot):
 
 if __name__ == "__main__":
     bot = Jasmine()
-    bot.run("MTUzOTc4ODk0NTU0MDUxMzgzMg.G8d4EK.r-hDF_4X8twdVj89MgdCW4-Ovlig1acUSf1gvg")
+    token = os.getenv("JASMINE_TOKEN")  # A Railway környezeti változójából olvassa be
+    bot.run(token)
