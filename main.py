@@ -98,20 +98,17 @@ class Jasmine(commands.Bot):
             
             await channel.send(embed=embed)
 
+    # --- TWITCH ÉLŐ ÉRTESÍTÉS ---
+    @commands.command(name="stream")
+    @commands.has_permissions(administrator=True)
+    async def stream_alert(self, ctx, platform: str = "twitch", *, link: str = "https://www.twitch.tv/maskedsparkle"):
+        channel_id = 1497351886360023048  # Twitch csatorna ID
+        channel = self.get_channel(channel_id)
+        
+        if not channel:
+            await ctx.send("Nem találom a Twitch csatornát!")
+            return
 
-# --- TWITCH ÉLŐ ÉRTESÍTÉS ---
-@bot.command(name="stream")
-@commands.has_permissions(administrator=True)
-async def stream_alert(ctx, platform: str, *, link: str = "https://www.twitch.tv/maskedsparkle"):
-    channel_id = 1497351886360023048  # Twitch csatorna ID
-    channel = bot.get_channel(channel_id)
-    
-    if not channel:
-        await ctx.send("Nem találom a Twitch csatornát!")
-        return
-
-    platform = platform.lower()
-    if platform == "twitch":
         embed = discord.Embed(
             title="🟣 Új Twitch Élőadás!",
             description=f"Hahó mindenki! Élőbe mentem a Twitchen, gyertek minél többen! 💖\n\n👉 **Kattints ide a nézéshez:** {link}",
@@ -120,23 +117,18 @@ async def stream_alert(ctx, platform: str, *, link: str = "https://www.twitch.tv
         embed.set_footer(text="Jasmine értesítője ✨")
         await channel.send(content="Helló @everyone! Élő adás van! 🔔", embed=embed)
         await ctx.message.delete()
-    else:
-        await ctx.send("Használat: `!stream twitch`")
 
+    # --- YOUTUBE VIDEÓ ÉRTESÍTÉS ---
+    @commands.command(name="video")
+    @commands.has_permissions(administrator=True)
+    async def video_alert(self, ctx, platform: str = "yt", *, link: str = "https://www.youtube.com/@Sparkle_fix"):
+        channel_id = 1497351931360841820  # YouTube csatorna ID
+        channel = self.get_channel(channel_id)
+        
+        if not channel:
+            await ctx.send("Nem találom a YouTube csatornát!")
+            return
 
-# --- YOUTUBE VIDEÓ ÉRTESÍTÉS ---
-@bot.command(name="video")
-@commands.has_permissions(administrator=True)
-async def video_alert(ctx, platform: str, *, link: str):
-    channel_id = 1497351931360841820  # YouTube csatorna ID
-    channel = bot.get_channel(channel_id)
-    
-    if not channel:
-        await ctx.send("Nem találom a YouTube csatornát!")
-        return
-
-    platform = platform.lower()
-    if platform in ["yt", "youtube"]:
         embed = discord.Embed(
             title="🔴 Új YouTube Videó érkezett!",
             description=f"Új tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {link}",
@@ -145,31 +137,28 @@ async def video_alert(ctx, platform: str, *, link: str):
         embed.set_footer(text="Jasmine értesítője 🌸")
         await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         await ctx.message.delete()
-    else:
-        await ctx.send("Használat: `!video yt [link]` (Elérhető YouTube csatornák: https://www.youtube.com/@Sparkle_fix vagy https://www.youtube.com/@NeverSMPmc)")
 
+    # --- TIKTOK ÉRTESÍTÉS ---
+    @commands.command(name="tiktok")
+    @commands.has_permissions(administrator=True)
+    async def tiktok_alert(self, ctx, *, link: str = "https://www.tiktok.com/@masked_sparkle"):
+        channel_id = 1510603200284328037  # TikTok csatorna ID
+        channel = self.get_channel(channel_id)
+        
+        if not channel:
+            await ctx.send("Nem találom a TikTok csatornát!")
+            return
 
-# --- TIKTOK ÉRTESÍTÉS (Élő vagy Videó) ---
-@commands.has_permissions(administrator=True)
-@bot.command(name="tiktok")
-async def tiktok_alert(ctx, *, link: str = "https://www.tiktok.com/@masked_sparkle"):
-    channel_id = 1510603200284328037  # TikTok csatorna ID
-    channel = bot.get_channel(channel_id)
-    
-    if not channel:
-        await ctx.send("Nem találom a TikTok csatornát!")
-        return
-
-    embed = discord.Embed(
-        title="📱 Új TikTok Tartalom!",
-        description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
-        color=discord.Color.dark_theme()
-    )
-    embed.set_footer(text="Jasmine értesítője ✨")
-    await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
-    await ctx.message.delete()
-
+        embed = discord.Embed(
+            title="📱 Új TikTok Tartalom!",
+            description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
+            color=discord.Color.dark_theme()
+        )
+        embed.set_footer(text="Jasmine értesítője ✨")
+        await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
+        await ctx.message.delete()
 
 if __name__ == "__main__":
     token = os.getenv("JASMINE_TOKEN") 
+    bot = Jasmine()
     bot.run(token)
