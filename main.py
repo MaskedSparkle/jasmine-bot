@@ -4,11 +4,11 @@ import datetime
 import os
 
 class Jasmine(commands.Bot):
-    def __init__(self):
+def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        intents.guild_bans = True  # <--- EZ HIÁNYZOTT A BANEK LEKÉRDEZÉSÉHEZ
+        intents.bans = True  # <--- ÍGY HELYES: intents.bans
         super().__init__(command_prefix='!', intents=intents)
 
     async def on_ready(self):
