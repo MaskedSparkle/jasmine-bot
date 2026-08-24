@@ -8,7 +8,7 @@ class Jasmine(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        intents.moderation = True  # Szükséges a kitiltások ellenőrzéséhez
+        intents.guild_bans = True  # <--- EZ HIÁNYZOTT A BANEK LEKÉRDEZÉSÉHEZ
         super().__init__(command_prefix='!', intents=intents)
 
     async def on_ready(self):
@@ -20,7 +20,7 @@ class Jasmine(commands.Bot):
         # 1. Ellenőrizzük, hogy ki van-e tiltva (bannolva)
         try:
             async for entry in member.guild.audit_logs(limit=5, action=discord.AuditLogAction.ban):
-                if entry.target.id == member.id:
+                if entry.target and entry.target.id == member.id:
                     is_banned = True
                     break
         except discord.Forbidden:
@@ -102,7 +102,7 @@ class Jasmine(commands.Bot):
     @commands.command(name="stream")
     @commands.has_permissions(administrator=True)
     async def stream_alert(self, ctx, platform: str = "twitch", *, link: str = "https://www.twitch.tv/maskedsparkle"):
-        channel_id = 1497351886360023048  # Twitch csatorna ID
+        channel_id = 1497351886360023048 # Twitch csatorna ID
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -122,7 +122,7 @@ class Jasmine(commands.Bot):
     @commands.command(name="video")
     @commands.has_permissions(administrator=True)
     async def video_alert(self, ctx, platform: str = "yt", *, link: str = "https://www.youtube.com/@Sparkle_fix"):
-        channel_id = 1497351931360841820  # YouTube csatorna ID
+        channel_id = 1497351931360841820 # YouTube csatorna ID
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -142,7 +142,7 @@ class Jasmine(commands.Bot):
     @commands.command(name="tiktok")
     @commands.has_permissions(administrator=True)
     async def tiktok_alert(self, ctx, *, link: str = "https://www.tiktok.com/@masked_sparkle"):
-        channel_id = 1510603200284328037  # TikTok csatorna ID
+        channel_id = 1510603200284328037 # TikTok csatorna ID
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -152,7 +152,7 @@ class Jasmine(commands.Bot):
         embed = discord.Embed(
             title="📱 Új TikTok Tartalom!",
             description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
-            color=discord.Color.dark_theme()
+            color=discord.Color.dark_embed()  # Javítva dark_theme()-ről
         )
         embed.set_footer(text="Jasmine értesítője ✨")
         await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
