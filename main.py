@@ -40,7 +40,7 @@ class Jasmine(commands.Bot):
     # 1. YouTube Automata Ellenőrzés
     async def check_youtube(self):
         # Cseréld ki a csatornád ID-jára (pl. UC... a forráskódból)
-        channel_id = "IDE_IRD_BE_A_YOUTUBE_CSATORNA_ID_DET" 
+        channel_id = "UCcKLZHpGu8yp8nQi17Iwmmg" 
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         
         try:
@@ -110,7 +110,7 @@ class Jasmine(commands.Bot):
             try:
                 ban_embed = discord.Embed(
                     title="🚫 Sajnálom, de nem tudsz belépni!",
-                    description="Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak... 🌸",
+                    description="Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak nem átalam én csak egy üdvözlö bot vagyok aki ki bannolt volna az vagy a hugom kamila vagy egy staff/Tulajdonos ugy tudsz vissza jönni ha tulajdonos vagy staff unbanol téged 🌸",
                     color=discord.Color.red()
                 )
                 await member.send(embed=ban_embed)
@@ -136,7 +136,7 @@ class Jasmine(commands.Bot):
             embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
             await channel.send(embed=embed)
 
-        try:
+        try:    
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
                 description="Örülök, hogy csatlakoztál a **Never SMP**-hez. Érezd nagyon jól magad nálunk! 🌸✨",
