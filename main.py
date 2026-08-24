@@ -30,8 +30,6 @@ class Jasmine(commands.Bot):
     async def check_platforms(self):
         await self.check_youtube()
         await self.check_tiktok()
-        # A Twitch-hez tokenszükséglet miatt külön függőség is lehet, 
-        # de a sima RSS/webes ellenőrzés vagy kézi parancs mellett itt az alap logika.
 
     @check_platforms.before_loop
     async def before_check_platforms(self):
@@ -39,8 +37,7 @@ class Jasmine(commands.Bot):
 
     # 1. YouTube Automata Ellenőrzés
     async def check_youtube(self):
-        # Cseréld ki a csatornád ID-jára (pl. UC... a forráskódból)
-        channel_id = "UCcKLZHpGu8yp8nQi17Iwmmg" 
+        channel_id = "UCcKLZHpGu8yp8nQi17lwmmg" 
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         
         try:
@@ -52,6 +49,13 @@ class Jasmine(commands.Bot):
                 elif latest.link != self.last_youtube_link:
                     self.last_youtube_link = latest.link
                     
+                    # Videó ID kiszedése az RSS linkből
+                    video_id = ""
+                    if "watch?v=" in latest.link:
+                        video_id = latest.link.split("watch?v=")[1].split("&")[0]
+                    elif "/shorts/" in latest.link:
+                        video_id = latest.link.split("/shorts/")[1].split("?")[0]
+
                     channel = self.get_channel(1497351931360841820) # YouTube csatorna ID Discordon
                     if channel:
                         embed = discord.Embed(
@@ -59,6 +63,10 @@ class Jasmine(commands.Bot):
                             description=f"**{latest.title}**\n\nÚj tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {latest.link}",
                             color=discord.Color.red()
                         )
+                        # Indexkép automatikus hozzáadása
+                        if video_id:
+                            embed.set_image(url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg")
+
                         embed.set_footer(text="Jasmine értesítője 🌸")
                         await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         except Exception as e:
@@ -66,7 +74,7 @@ class Jasmine(commands.Bot):
 
     # 2. TikTok Automata Ellenőrzés (RSS feed alapon)
     async def check_tiktok(self):
-        tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss" # Vagy egy külső RSS generátor
+        tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss" 
         try:
             feed = feedparser.parse(tiktok_rss)
             if feed.entries:
@@ -86,7 +94,7 @@ class Jasmine(commands.Bot):
                         embed.set_footer(text="Jasmine értesítője ✨")
                         await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
         except Exception as e:
-            pass # Ha a TikTok blokkolná az RSS-t, nem áll le a bot
+            pass 
 
     async def on_member_join(self, member):
         is_banned = False
@@ -159,7 +167,7 @@ class Jasmine(commands.Bot):
             embed.set_footer(text="Jasmine, a szerver tündérkéje 🌸")
             await channel.send(embed=embed)
 
-    # --- KÉZI PARANCSOK (Ha azonnal ki akarod küldeni vészhelyzetben) ---
+    # --- KÉZI PARANCSOK ---
     @commands.command(name="stream")
     @commands.has_permissions(administrator=True)
     async def stream_alert(self, ctx, *, link: str = "https://www.twitch.tv/maskedsparkle"):
@@ -184,6 +192,15 @@ class Jasmine(commands.Bot):
                 description=f"Új tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {link}",
                 color=discord.Color.red()
             )
+            
+            # Kézi parancs videó ID kinyerése és indexkép beállítása
+            if "watch?v=" in link:
+                v_id = link.split("watch?v=")[1].split("&")[0]
+                embed.set_image(url=f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg")
+            elif "/shorts/" in link:
+                v_id = link.split("/shorts/")[1].split("?")[0]
+                embed.set_image(url=f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg")
+
             embed.set_footer(text="Jasmine értesítője 🌸")
             await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         await ctx.message.delete()
