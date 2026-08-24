@@ -1,7 +1,9 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import datetime
 import os
+import feedparser  # Telepítsd: pip install feedparser
+import aiohttp     # Telepítsd: pip install aiohttp (ha még nincs)
 
 class Jasmine(commands.Bot):
     def __init__(self):
@@ -10,14 +12,84 @@ class Jasmine(commands.Bot):
         intents.message_content = True
         intents.bans = True
         super().__init__(command_prefix='!', intents=intents)
+        
+        # Nyomon követési változók, hogy ne spammeljen duplán
+        self.last_youtube_link = None
+        self.was_twitch_live = False
+        self.last_tiktok_link = None
+
+    async def setup_hook(self):
+        # Háttérben futó automatikus ellenőrzők elindítása
+        self.check_platforms.start()
 
     async def on_ready(self):
         print(f"Jasmine sikeresen bejelentkezett mint {self.user} ✨")
 
+    # --- MINDEN PLATFORMOT FIGYELŐ AUTOMATA CIKLUS (5 percenként) ---
+    @tasks.loop(minutes=5)
+    async def check_platforms(self):
+        await self.check_youtube()
+        await self.check_tiktok()
+        # A Twitch-hez tokenszükséglet miatt külön függőség is lehet, 
+        # de a sima RSS/webes ellenőrzés vagy kézi parancs mellett itt az alap logika.
+
+    @check_platforms.before_loop
+    async def before_check_platforms(self):
+        await self.wait_until_ready()
+
+    # 1. YouTube Automata Ellenőrzés
+    async def check_youtube(self):
+        # Cseréld ki a csatornád ID-jára (pl. UC... a forráskódból)
+        channel_id = "IDE_IRD_BE_A_YOUTUBE_CSATORNA_ID_DET" 
+        rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+        
+        try:
+            feed = feedparser.parse(rss_url)
+            if feed.entries:
+                latest = feed.entries[0]
+                if self.last_youtube_link is None:
+                    self.last_youtube_link = latest.link
+                elif latest.link != self.last_youtube_link:
+                    self.last_youtube_link = latest.link
+                    
+                    channel = self.get_channel(1497351931360841820) # YouTube csatorna ID Discordon
+                    if channel:
+                        embed = discord.Embed(
+                            title="🔴 Új YouTube Videó érkezett!",
+                            description=f"**{latest.title}**\n\nÚj tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {latest.link}",
+                            color=discord.Color.red()
+                        )
+                        embed.set_footer(text="Jasmine értesítője 🌸")
+                        await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
+        except Exception as e:
+            print(f"Hiba a YouTube ellenőrzésekor: {e}")
+
+    # 2. TikTok Automata Ellenőrzés (RSS feed alapon)
+    async def check_tiktok(self):
+        tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss" # Vagy egy külső RSS generátor
+        try:
+            feed = feedparser.parse(tiktok_rss)
+            if feed.entries:
+                latest = feed.entries[0]
+                if self.last_tiktok_link is None:
+                    self.last_tiktok_link = latest.link
+                elif latest.link != self.last_tiktok_link:
+                    self.last_tiktok_link = latest.link
+                    
+                    channel = self.get_channel(1510603200284328037) # TikTok csatorna ID Discordon
+                    if channel:
+                        embed = discord.Embed(
+                            title="📱 Új TikTok Tartalom!",
+                            description=f"**{latest.title}**\n\nÚj videót toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {latest.link}",
+                            color=discord.Color.dark_embed()
+                        )
+                        embed.set_footer(text="Jasmine értesítője ✨")
+                        await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
+        except Exception as e:
+            pass # Ha a TikTok blokkolná az RSS-t, nem áll le a bot
+
     async def on_member_join(self, member):
         is_banned = False
-        
-        # 1. Ellenőrizzük, hogy ki van-e tiltva (bannolva)
         try:
             async for entry in member.guild.audit_logs(limit=5, action=discord.AuditLogAction.ban):
                 if entry.target and entry.target.id == member.id:
@@ -34,21 +106,18 @@ class Jasmine(commands.Bot):
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
-        # Ha ki van bannolva, Jasmine elküldi a DM-et, és megállítjuk a folyamatot
         if is_banned:
             try:
                 ban_embed = discord.Embed(
                     title="🚫 Sajnálom, de nem tudsz belépni!",
-                    description="Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak. Vagy a hugom, Kamila bannolt, vagy valamelyik staff, esetleg a tulajdonos.\n\nHa a tulaj úgy gondolja, akkor unbannol téged, de én nem tudlak, mert én csak egy bot vagyok, semmi más! 🌸",
+                    description="Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak... 🌸",
                     color=discord.Color.red()
                 )
-                ban_embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
                 await member.send(embed=ban_embed)
             except discord.Forbidden:
                 pass
             return
 
-        # 2. Normál, sikeres belépés (ha NINCS bannolva)
         channel = self.get_channel(1539791346880221196) 
         if channel:
             member_count = member.guild.member_count
@@ -56,29 +125,23 @@ class Jasmine(commands.Bot):
             
             embed = discord.Embed(
                 title="🌸 Új csillag érkezett a Never SMP-re! 🌸",
-                description=f"Szia {member.mention}! De örülök, hogy megérkeztél! ✨\nLégy nagyon boldog nálunk, és érezd otthon magad ebben a kis világunkban! 🐾",
+                description=f"Szia {member.mention}! De örülök, hogy megérkeztél! ✨\nLégy nagyon boldog nálunk! 🐾",
                 color=discord.Color.pink()
             )
-            
             embed.add_field(name="Túlélő ID", value=f"`{member.id}`", inline=False)
             embed.add_field(name="Csatlakozás ideje", value=f"{join_date}", inline=True)
             embed.add_field(name="Túlélők száma", value=f"{member_count}. tag vagy! 💖", inline=True)
-            
             if member.display_avatar:
                 embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
-            
             await channel.send(embed=embed)
 
-        # Privát (DM) üzenet a normális tagoknak
         try:
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
-                description="Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy elakadsz, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
+                description="Örülök, hogy csatlakoztál a **Never SMP**-hez. Érezd nagyon jól magad nálunk! 🌸✨",
                 color=discord.Color.pink()
             )
-            dm_embed.set_footer(text="Szeretettel: Jasmine 🐾")
-            
             await member.send(embed=dm_embed)
         except discord.Forbidden:
             pass
@@ -88,74 +151,55 @@ class Jasmine(commands.Bot):
         if channel:
             embed = discord.Embed(
                 title="🥀 Egy túlélő elhagyott minket...",
-                description=f"Jaj, {member.name} útra kelt... Nagyon fog hiányozni a Never SMP világából! 💔\nRemélem, még viszontlátjuk egymást valamikor... ✨",
+                description=f"Jaj, {member.name} útra kelt... Nagyon fog hiányozni a Never SMP világából! 💔",
                 color=discord.Color.dark_gray()
             )
-            
             if member.display_avatar:
                 embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text="Jasmine, a szerver tündérkéje 🌸")
-            
             await channel.send(embed=embed)
 
-    # --- TWITCH ÉLŐ ÉRTESÍTÉS ---
+    # --- KÉZI PARANCSOK (Ha azonnal ki akarod küldeni vészhelyzetben) ---
     @commands.command(name="stream")
     @commands.has_permissions(administrator=True)
-    async def stream_alert(self, ctx, platform: str = "twitch", *, link: str = "https://www.twitch.tv/maskedsparkle"):
-        channel_id = 1497351886360023048
-        channel = self.get_channel(channel_id)
-        
-        if not channel:
-            await ctx.send("Nem találom a Twitch csatornát!")
-            return
-
-        embed = discord.Embed(
-            title="🟣 Új Twitch Élőadás!",
-            description=f"Hahó mindenki! Élőbe mentem a Twitchen, gyertek minél többen! 💖\n\n👉 **Kattints ide a nézéshez:** {link}",
-            color=discord.Color.purple()
-        )
-        embed.set_footer(text="Jasmine értesítője ✨")
-        await channel.send(content="Helló @everyone! Élő adás van! 🔔", embed=embed)
+    async def stream_alert(self, ctx, *, link: str = "https://www.twitch.tv/maskedsparkle"):
+        channel = self.get_channel(1497351886360023048)
+        if channel:
+            embed = discord.Embed(
+                title="🟣 Új Twitch Élőadás!",
+                description=f"Hahó mindenki! Élőbe mentem a Twitchen, gyertek minél többen! 💖\n\n👉 **Kattints ide a nézéshez:** {link}",
+                color=discord.Color.purple()
+            )
+            embed.set_footer(text="Jasmine értesítője ✨")
+            await channel.send(content="Helló @everyone! Élő adás van! 🔔", embed=embed)
         await ctx.message.delete()
 
-    # --- YOUTUBE VIDEÓ ÉRTESÍTÉS ---
     @commands.command(name="video")
     @commands.has_permissions(administrator=True)
-    async def video_alert(self, ctx, platform: str = "yt", *, link: str = "https://www.youtube.com/@Sparkle_fix"):
-        channel_id = 1497351931360841820
-        channel = self.get_channel(channel_id)
-        
-        if not channel:
-            await ctx.send("Nem találom a YouTube csatornát!")
-            return
-
-        embed = discord.Embed(
-            title="🔴 Új YouTube Videó érkezett!",
-            description=f"Új tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {link}",
-            color=discord.Color.red()
-        )
-        embed.set_footer(text="Jasmine értesítője 🌸")
-        await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
+    async def video_alert(self, ctx, *, link: str = "https://www.youtube.com/@Sparkle_fix"):
+        channel = self.get_channel(1497351931360841820)
+        if channel:
+            embed = discord.Embed(
+                title="🔴 Új YouTube Videó érkezett!",
+                description=f"Új tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {link}",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Jasmine értesítője 🌸")
+            await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         await ctx.message.delete()
 
-    # --- TIKTOK ÉRTESÍTÉS ---
     @commands.command(name="tiktok")
     @commands.has_permissions(administrator=True)
     async def tiktok_alert(self, ctx, *, link: str = "https://www.tiktok.com/@masked_sparkle"):
-        channel_id = 1510603200284328037
-        channel = self.get_channel(channel_id)
-        
-        if not channel:
-            await ctx.send("Nem találom a TikTok csatornát!")
-            return
-
-        embed = discord.Embed(
-            title="📱 Új TikTok Tartalom!",
-            description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
-            color=discord.Color.dark_embed()
-        )
-        embed.set_footer(text="Jasmine értesítője ✨")
-        await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
+        channel = self.get_channel(1510603200284328037)
+        if channel:
+            embed = discord.Embed(
+                title="📱 Új TikTok Tartalom!",
+                description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
+                color=discord.Color.dark_embed()
+            )
+            embed.set_footer(text="Jasmine értesítője ✨")
+            await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
         await ctx.message.delete()
 
 if __name__ == "__main__":
