@@ -4,11 +4,11 @@ import datetime
 import os
 
 class Jasmine(commands.Bot):
-def __init__(self):
+    def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        intents.bans = True  # <--- ÍGY HELYES: intents.bans
+        intents.bans = True
         super().__init__(command_prefix='!', intents=intents)
 
     async def on_ready(self):
@@ -39,7 +39,7 @@ def __init__(self):
             try:
                 ban_embed = discord.Embed(
                     title="🚫 Sajnálom, de nem tudsz belépni!",
-                    description=f"Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak. Vagy a hugom, Kamila bannolt, vagy valamelyik staff, esetleg a tulajdonos.\n\nHa a tulaj úgy gondolja, akkor unbannol téged, de én nem tudlak, mert én csak egy bot vagyok, semmi más! 🌸",
+                    description="Szia! Bocsi, de te nem fogsz tudni bejönni a szerverre, ugyanis téged bannoltak. Vagy a hugom, Kamila bannolt, vagy valamelyik staff, esetleg a tulajdonos.\n\nHa a tulaj úgy gondolja, akkor unbannol téged, de én nem tudlak, mert én csak egy bot vagyok, semmi más! 🌸",
                     color=discord.Color.red()
                 )
                 ban_embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
@@ -74,7 +74,7 @@ def __init__(self):
         try:
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
-                description=f"Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy elakadsz, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
+                description="Csak be akartam köszönni így privátban is! 😊 Örülök, hogy csatlakoztál a **Never SMP**-hez.\n\nHa bármi kérdésed van, vagy elakadsz, nyugodtan keress minket a szerveren. Érezd nagyon jól magad nálunk! 🌸✨",
                 color=discord.Color.pink()
             )
             dm_embed.set_footer(text="Szeretettel: Jasmine 🐾")
@@ -102,7 +102,7 @@ def __init__(self):
     @commands.command(name="stream")
     @commands.has_permissions(administrator=True)
     async def stream_alert(self, ctx, platform: str = "twitch", *, link: str = "https://www.twitch.tv/maskedsparkle"):
-        channel_id = 1497351886360023048 # Twitch csatorna ID
+        channel_id = 1497351886360023048
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -122,7 +122,7 @@ def __init__(self):
     @commands.command(name="video")
     @commands.has_permissions(administrator=True)
     async def video_alert(self, ctx, platform: str = "yt", *, link: str = "https://www.youtube.com/@Sparkle_fix"):
-        channel_id = 1497351931360841820 # YouTube csatorna ID
+        channel_id = 1497351931360841820
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -142,7 +142,7 @@ def __init__(self):
     @commands.command(name="tiktok")
     @commands.has_permissions(administrator=True)
     async def tiktok_alert(self, ctx, *, link: str = "https://www.tiktok.com/@masked_sparkle"):
-        channel_id = 1510603200284328037 # TikTok csatorna ID
+        channel_id = 1510603200284328037
         channel = self.get_channel(channel_id)
         
         if not channel:
@@ -152,7 +152,7 @@ def __init__(self):
         embed = discord.Embed(
             title="📱 Új TikTok Tartalom!",
             description=f"Új videót vagy live-ot toltam ki TikTokra! Csekkoljátok le! 💖\n\n👉 **Itt éritek el:** {link}",
-            color=discord.Color.dark_embed()  # Javítva dark_theme()-ről
+            color=discord.Color.dark_embed()
         )
         embed.set_footer(text="Jasmine értesítője ✨")
         await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
