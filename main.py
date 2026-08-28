@@ -157,11 +157,15 @@ class Jasmine(commands.Bot):
     async def on_member_remove(self, member):
         channel = self.get_channel(1539791383815258172) 
         if channel:
+            # Itt vonjuk le -1-et, hogy a valós, aktuális létszámot írja ki kilépés után
+            new_member_count = member.guild.member_count - 1
+
             embed = discord.Embed(
                 title="🥀 Egy túlélő elhagyott minket...",
-                description=f"Jaj, {member.name} útra kelt... Nagyon fog hiányozni a Never SMP világából! 💔",
+                description=f"Jaj, **{member.name}** útra kelt... Nagyon fog hiányozni a Never SMP világából! 💔",
                 color=discord.Color.dark_gray()
             )
+            embed.add_field(name="Jelenlegi túlélők", value=f"Már csak **{new_member_count}**-en maradtunk a szerveren. 🥺", inline=False)
             if member.display_avatar:
                 embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text="Jasmine, a szerver tündérkéje 🌸")
@@ -193,7 +197,6 @@ class Jasmine(commands.Bot):
                 color=discord.Color.red()
             )
             
-            # Kézi parancs videó ID kinyerése és indexkép beállítása
             if "watch?v=" in link:
                 v_id = link.split("watch?v=")[1].split("&")[0]
                 embed.set_image(url=f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg")
