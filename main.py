@@ -19,7 +19,7 @@ class Jasmine(commands.Bot):
         self.last_tiktok_link = None
 
     async def setup_hook(self):
-        # Háttérben futó automatikus ellenőrzők elindítása
+        # Háttérben futó automatikus ellenőrzök elindítása
         self.check_platforms.start()
 
     async def on_ready(self):
@@ -157,7 +157,6 @@ class Jasmine(commands.Bot):
     async def on_member_remove(self, member):
         channel = self.get_channel(1539791383815258172) 
         if channel:
-            # Itt vonjuk le -1-et, hogy a valós, aktuális létszámot írja ki kilépés után
             new_member_count = member.guild.member_count - 1
 
             embed = discord.Embed(
