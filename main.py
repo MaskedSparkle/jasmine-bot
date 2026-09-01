@@ -17,6 +17,9 @@ class Jasmine(commands.Bot):
         self.last_youtube_link = None
         self.was_twitch_live = False
         self.last_tiktok_link = None
+        
+        # Nyomon követi, hogy kinek üdvözölte már be a "szia" (hogy ne spammeljen)
+        self.greeted_users = set()
 
     async def setup_hook(self):
         # Háttérben futó automatikus ellenőrzök elindítása
@@ -24,6 +27,30 @@ class Jasmine(commands.Bot):
 
     async def on_ready(self):
         print(f"Jasmine sikeresen bejelentkezett mint {self.user} ✨")
+
+    # --- ÜZENET FIGYELŐ (A kért funkciók itt futnak) ---
+    async def on_message(self, message):
+        # Ne reagáljon a saját üzeneteire, vagy botok üzeneteire
+        if message.author.bot:
+            return
+
+        content_lower = message.content.lower()
+
+        # 1. "Sziasztok" üdvözlés (csak egyszer egy embernek)
+        if "sziasztok" in content_lower:
+            if message.author.id not in self.greeted_users:
+                self.greeted_users.add(message.author.id)
+                await message.channel.send(f"Szia {message.author.mention}! 🌸")
+
+        # 2. Tulajdonos kérdés felismerése
+        owner_keywords = ["ki itt a tulaj", "ki a tulaj", "ki a tulajdonos", "ki csinálta a szervert", "ki a fönök", "ki a szerver tulajdonosa"]
+        if any(keyword in content_lower for keyword in owner_keywords):
+            # Cseréld ki ezt a számot a saját Discord User ID-dra, hogy helyesen pingeljen!
+            cassidy_id = 1047920915641548921  # <-- IDE ÍRD BE A SAJÁT DISCORD ID-DAT (számként)
+            await message.channel.send(f"<@{cassidy_id}> a tulaj ✨")
+
+        # Fontos, hogy a parancsok is működjenek (ez kötelező, ha van on_message override)
+        await self.process_commands(message)
 
     # --- MINDEN PLATFORMOT FIGYELŐ AUTOMATA CIKLUS (5 percenként) ---
     @tasks.loop(minutes=5)
