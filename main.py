@@ -2,8 +2,8 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import os
-import feedparser  # Telepítsd: pip install feedparser
-import aiohttp     # Telepítsd: pip install aiohttp (ha még nincs)
+import feedparser  
+import aiohttp    
 
 class Jasmine(commands.Bot):
     def __init__(self):
@@ -13,46 +13,46 @@ class Jasmine(commands.Bot):
         intents.bans = True
         super().__init__(command_prefix='!', intents=intents)
         
-        # Nyomon követési változók, hogy ne spammeljen duplán
+      
         self.last_youtube_link = None
         self.was_twitch_live = False
         self.last_tiktok_link = None
         
-        # Nyomon követi, hogy kinek üdvözölte már be a "szia" (hogy ne spammeljen)
+       
         self.greeted_users = set()
 
     async def setup_hook(self):
-        # Háttérben futó automatikus ellenőrzök elindítása
+     
         self.check_platforms.start()
 
     async def on_ready(self):
         print(f"Jasmine sikeresen bejelentkezett mint {self.user} ✨")
 
-    # --- ÜZENET FIGYELŐ (A kért funkciók itt futnak) ---
+   
     async def on_message(self, message):
-        # Ne reagáljon a saját üzeneteire, vagy botok üzeneteire
+   
         if message.author.bot:
             return
 
         content_lower = message.content.lower()
 
-        # 1. "Sziasztok" üdvözlés (csak egyszer egy embernek)
+      
         if "sziasztok" in content_lower:
             if message.author.id not in self.greeted_users:
                 self.greeted_users.add(message.author.id)
                 await message.channel.send(f"Szia {message.author.mention}! 🌸")
 
-        # 2. Tulajdonos kérdés felismerése
+     
         owner_keywords = ["ki itt a tulaj", "ki a tulaj", "ki a tulajdonos", "ki csinálta a szervert", "ki a fönök", "ki a szerver tulajdonosa"]
         if any(keyword in content_lower for keyword in owner_keywords):
-            # Cseréld ki ezt a számot a saját Discord User ID-dra, hogy helyesen pingeljen!
-            cassidy_id = 1047920915641548921  # <-- IDE ÍRD BE A SAJÁT DISCORD ID-DAT (számként)
+            
+            cassidy_id = 1047920915641548921 
             await message.channel.send(f"<@{cassidy_id}> a tulaj ✨")
 
-        # Fontos, hogy a parancsok is működjenek (ez kötelező, ha van on_message override)
+      
         await self.process_commands(message)
 
-    # --- MINDEN PLATFORMOT FIGYELŐ AUTOMATA CIKLUS (5 percenként) ---
+    
     @tasks.loop(minutes=5)
     async def check_platforms(self):
         await self.check_youtube()
@@ -62,7 +62,7 @@ class Jasmine(commands.Bot):
     async def before_check_platforms(self):
         await self.wait_until_ready()
 
-    # 1. YouTube Automata Ellenőrzés
+
     async def check_youtube(self):
         channel_id = "UCcKLZHpGu8yp8nQi17lwmmg" 
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
@@ -76,21 +76,21 @@ class Jasmine(commands.Bot):
                 elif latest.link != self.last_youtube_link:
                     self.last_youtube_link = latest.link
                     
-                    # Videó ID kiszedése az RSS linkből
+                    
                     video_id = ""
                     if "watch?v=" in latest.link:
                         video_id = latest.link.split("watch?v=")[1].split("&")[0]
                     elif "/shorts/" in latest.link:
                         video_id = latest.link.split("/shorts/")[1].split("?")[0]
 
-                    channel = self.get_channel(1497351931360841820) # YouTube csatorna ID Discordon
+                    channel = self.get_channel(1497351931360841820) 
                     if channel:
                         embed = discord.Embed(
                             title="🔴 Új YouTube Videó érkezett!",
                             description=f"**{latest.title}**\n\nÚj tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {latest.link}",
                             color=discord.Color.red()
                         )
-                        # Indexkép automatikus hozzáadása
+                       
                         if video_id:
                             embed.set_image(url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg")
 
@@ -99,7 +99,7 @@ class Jasmine(commands.Bot):
         except Exception as e:
             print(f"Hiba a YouTube ellenőrzésekor: {e}")
 
-    # 2. TikTok Automata Ellenőrzés (RSS feed alapon)
+   
     async def check_tiktok(self):
         tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss" 
         try:
@@ -111,7 +111,7 @@ class Jasmine(commands.Bot):
                 elif latest.link != self.last_tiktok_link:
                     self.last_tiktok_link = latest.link
                     
-                    channel = self.get_channel(1510603200284328037) # TikTok csatorna ID Discordon
+                    channel = self.get_channel(1510603200284328037) 
                     if channel:
                         embed = discord.Embed(
                             title="📱 Új TikTok Tartalom!",
