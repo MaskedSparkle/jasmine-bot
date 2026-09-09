@@ -2,8 +2,21 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import os
-import feedparser  
-import aiohttp    
+import feedparser
+import aiohttp
+from flask import Flask
+import threading
+
+# --- RENDER WEB PORT (ezért volt Timed Out) ---
+app_web = Flask(__name__)
+@app_web.route('/')
+def home():
+    return "Jasmine is alive! 🌸"
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app_web.run(host='0.0.0.0', port=port)
+threading.Thread(target=run_web, daemon=True).start()
+# --- VÉGE ---
 
 class Jasmine(commands.Bot):
     def __init__(self):
@@ -12,47 +25,32 @@ class Jasmine(commands.Bot):
         intents.message_content = True
         intents.bans = True
         super().__init__(command_prefix='!', intents=intents)
-        
-      
+
         self.last_youtube_link = None
         self.was_twitch_live = False
         self.last_tiktok_link = None
-        
-       
         self.greeted_users = set()
 
     async def setup_hook(self):
-     
         self.check_platforms.start()
 
     async def on_ready(self):
         print(f"Jasmine sikeresen bejelentkezett mint {self.user} ✨")
 
-   
     async def on_message(self, message):
-   
         if message.author.bot:
             return
-
         content_lower = message.content.lower()
-
-      
         if "sziasztok" in content_lower:
             if message.author.id not in self.greeted_users:
                 self.greeted_users.add(message.author.id)
                 await message.channel.send(f"Szia {message.author.mention}! 🌸")
-
-     
         owner_keywords = ["ki itt a tulaj", "ki a tulaj", "ki a tulajdonos", "ki csinálta a szervert", "ki a fönök", "ki a szerver tulajdonosa"]
         if any(keyword in content_lower for keyword in owner_keywords):
-            
-            cassidy_id = 1047920915641548921 
+            cassidy_id = 1047920915641548921
             await message.channel.send(f"<@{cassidy_id}> a tulaj ✨")
-
-      
         await self.process_commands(message)
 
-    
     @tasks.loop(minutes=5)
     async def check_platforms(self):
         await self.check_youtube()
@@ -62,56 +60,47 @@ class Jasmine(commands.Bot):
     async def before_check_platforms(self):
         await self.wait_until_ready()
 
-
     async def check_youtube(self):
-        channel_id = "UCcKLZHpGu8yp8nQi17lwmmg" 
+        channel_id = "UCcKLZHpGu8yp8nQi17lwmmg"
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        
         try:
             feed = feedparser.parse(rss_url)
             if feed.entries:
                 latest = feed.entries[0]
                 if self.last_youtube_link is None:
                     self.last_youtube_link = latest.link
-                elif latest.link != self.last_youtube_link:
+                elif latest.link!= self.last_youtube_link:
                     self.last_youtube_link = latest.link
-                    
-                    
                     video_id = ""
                     if "watch?v=" in latest.link:
                         video_id = latest.link.split("watch?v=")[1].split("&")[0]
                     elif "/shorts/" in latest.link:
                         video_id = latest.link.split("/shorts/")[1].split("?")[0]
-
-                    channel = self.get_channel(1497351931360841820) 
+                    channel = self.get_channel(1497351931360841820)
                     if channel:
                         embed = discord.Embed(
                             title="🔴 Új YouTube Videó érkezett!",
                             description=f"**{latest.title}**\n\nÚj tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {latest.link}",
                             color=discord.Color.red()
                         )
-                       
                         if video_id:
                             embed.set_image(url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg")
-
                         embed.set_footer(text="Jasmine értesítője 🌸")
                         await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         except Exception as e:
             print(f"Hiba a YouTube ellenőrzésekor: {e}")
 
-   
     async def check_tiktok(self):
-        tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss" 
+        tiktok_rss = "https://www.tiktok.com/@masked_sparkle/rss"
         try:
             feed = feedparser.parse(tiktok_rss)
             if feed.entries:
                 latest = feed.entries[0]
                 if self.last_tiktok_link is None:
                     self.last_tiktok_link = latest.link
-                elif latest.link != self.last_tiktok_link:
+                elif latest.link!= self.last_tiktok_link:
                     self.last_tiktok_link = latest.link
-                    
-                    channel = self.get_channel(1510603200284328037) 
+                    channel = self.get_channel(1510603200284328037)
                     if channel:
                         embed = discord.Embed(
                             title="📱 Új TikTok Tartalom!",
@@ -121,7 +110,7 @@ class Jasmine(commands.Bot):
                         embed.set_footer(text="Jasmine értesítője ✨")
                         await channel.send(content="Sziasztok @everyone! Új TikTok tartalom érkezett! 🎶", embed=embed)
         except Exception as e:
-            pass 
+            pass
 
     async def on_member_join(self, member):
         is_banned = False
@@ -132,7 +121,6 @@ class Jasmine(commands.Bot):
                     break
         except discord.Forbidden:
             pass
-        
         if not is_banned:
             try:
                 bans = [ban_entry.user.id async for ban_entry in member.guild.bans()]
@@ -140,7 +128,6 @@ class Jasmine(commands.Bot):
                     is_banned = True
             except (discord.Forbidden, discord.HTTPException):
                 pass
-
         if is_banned:
             try:
                 ban_embed = discord.Embed(
@@ -152,12 +139,10 @@ class Jasmine(commands.Bot):
             except discord.Forbidden:
                 pass
             return
-
-        channel = self.get_channel(1539791346880221196) 
+        channel = self.get_channel(1539791346880221196)
         if channel:
             member_count = member.guild.member_count
             join_date = member.joined_at.strftime("%Y-%m-%d - %H:%M") if member.joined_at else "Ismeretlen"
-            
             embed = discord.Embed(
                 title="🌸 Új csillag érkezett a Never SMP-re! 🌸",
                 description=f"Szia {member.mention}! De örülök, hogy megérkeztél! ✨\nLégy nagyon boldog nálunk! 🐾",
@@ -170,8 +155,7 @@ class Jasmine(commands.Bot):
                 embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text="Jasmine, a szerver tündérkéje ✨")
             await channel.send(embed=embed)
-
-        try:    
+        try:
             dm_embed = discord.Embed(
                 title="💌 Szia kedves Túlélő!",
                 description="Örülök, hogy csatlakoztál a **Never SMP**-hez. Érezd nagyon jól magad nálunk! 🌸✨",
@@ -182,10 +166,9 @@ class Jasmine(commands.Bot):
             pass
 
     async def on_member_remove(self, member):
-        channel = self.get_channel(1539791383815258172) 
+        channel = self.get_channel(1539791383815258172)
         if channel:
             new_member_count = member.guild.member_count - 1
-
             embed = discord.Embed(
                 title="🥀 Egy túlélő elhagyott minket...",
                 description=f"Jaj, **{member.name}** útra kelt... Nagyon fog hiányozni a Never SMP világából! 💔",
@@ -197,7 +180,6 @@ class Jasmine(commands.Bot):
             embed.set_footer(text="Jasmine, a szerver tündérkéje 🌸")
             await channel.send(embed=embed)
 
-    # --- KÉZI PARANCSOK ---
     @commands.command(name="stream")
     @commands.has_permissions(administrator=True)
     async def stream_alert(self, ctx, *, link: str = "https://www.twitch.tv/maskedsparkle"):
@@ -222,14 +204,12 @@ class Jasmine(commands.Bot):
                 description=f"Új tartalom került ki a csatornámra, lessétek meg bátran! ✨\n\n👉 **Nézzétek meg itt:** {link}",
                 color=discord.Color.red()
             )
-            
             if "watch?v=" in link:
                 v_id = link.split("watch?v=")[1].split("&")[0]
                 embed.set_image(url=f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg")
             elif "/shorts/" in link:
                 v_id = link.split("/shorts/")[1].split("?")[0]
                 embed.set_image(url=f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg")
-
             embed.set_footer(text="Jasmine értesítője 🌸")
             await channel.send(content="Sziasztok @everyone! Új YouTube videó van! 🎬", embed=embed)
         await ctx.message.delete()
@@ -249,6 +229,6 @@ class Jasmine(commands.Bot):
         await ctx.message.delete()
 
 if __name__ == "__main__":
-    token = os.getenv("JASMINE_TOKEN") 
+    token = os.getenv("JASMINE_TOKEN")
     bot = Jasmine()
     bot.run(token)
