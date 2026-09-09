@@ -7,7 +7,7 @@ import aiohttp
 from flask import Flask
 import threading
 
-# --- RENDER WEB PORT (ezért volt Timed Out) ---
+
 app_web = Flask(__name__)
 @app_web.route('/')
 def home():
@@ -16,7 +16,7 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app_web.run(host='0.0.0.0', port=port)
 threading.Thread(target=run_web, daemon=True).start()
-# --- VÉGE ---
+
 
 class Jasmine(commands.Bot):
     def __init__(self):
