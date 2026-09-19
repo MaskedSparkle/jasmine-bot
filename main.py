@@ -1,13 +1,14 @@
-import discord
+mport discord
 from discord import app_commands
 from discord.ext import commands, tasks
-import os, json, traceback, feedparser, threading, datetime, time
+import os, json, traceback, feedparser, threading, datetime, time, re
+import requests
 from flask import Flask
 
 app_web = Flask(__name__)
 @app_web.route('/')
 def home():
-    return "Jasmine FULL - All Commands + Discord Bridge Last Moment DM"
+    return "Jasmine FULL - All Commands + Handle Resolver + Discord Bridge"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -76,6 +77,48 @@ def format_message(template: str, member: discord.Member = None, user: discord.U
     except: pass
     return result
 
+def resolve_youtube_handle(handle_or_id: str):
+    """
+    Ha @TheOneCassidy formában jön, megpróbálja feloldani channel ID-ra.
+    Ha már UC-val kezdődik, visszaadja egyből.
+    """
+    s = handle_or_id.strip()
+    if not s:
+        return None, s
+    
+    
+    if s.startswith("UC") and len(s) >= 20:
+        return s, s
+
+    
+    handle = s
+    if not handle.startswith("@"):
+       
+        handle = "@" + handle
+
+    
+    try:
+        url = f"https://www.youtube.com/{handle}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=10)
+        text = r.text
+        
+        m = re.search(r'"channelId"\s*:\s*"(UC[^"]+)"', text)
+        if not m:
+            m = re.search(r'"externalId"\s*:\s*"(UC[^"]+)"', text)
+        if not m:
+            m = re.search(r'/channel/(UC[0-9A-Za-z_-]+)', text)
+        if m:
+            channel_id = m.group(1)
+            print(f"🔍 Handle feloldva: {handle} -> {channel_id}")
+            return channel_id, handle
+        else:
+            print(f"⚠️ Nem találtam channelId-t a {handle} oldalban, handle-ként próbálom")
+            return None, handle
+    except Exception as e:
+        print(f"Handle resolve hiba {handle}: {e}")
+        return None, handle
+
 class Jasmine(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -103,9 +146,14 @@ class Jasmine(commands.Bot):
                 "youtube_channel": None, "tiktok_channel": None, "welcome_channel": None,
                 "leave_channel": None, "stream_channel": None,
                 "youtube_channel_id": "UCcKLZHpGu8yp8nQi17lwmmg",
+                "youtube_handle": "@TheOneCassidy", # NEW
+                "tiktok_handle": "@masked_sparkle", # NEW
                 "tiktok_rss": "https://www.tiktok.com/@masked_sparkle/rss",
+                "twitch_channel": None, # NEW
+                "twitch_handle": None,
                 "welcome_enabled": True, "leave_enabled": True, "greeting_enabled": True,
                 "dm_enabled": True, "ban_dm_enabled": True,
+                "youtube_enabled": True, "tiktok_enabled": True, "twitch_enabled": False,
                 "greeting_mode": "once", "greeting_trigger": "sziasztok",
                 "welcome_message": "Szia {member.mention}! De örülök, hogy megérkeztél a **{guild.name}**-re! ✨\nTe vagy a(z) {member_count}. tag! 🐾",
                 "leave_message": "Jaj, **{member.name}** elhagyott minket a **{guild.name}**-ről... 🥀\nMár csak {member_count}-en maradtunk. 💔",
@@ -116,7 +164,9 @@ class Jasmine(commands.Bot):
             }
         defaults = {
             "welcome_enabled": True, "leave_enabled": True, "greeting_enabled": True, "dm_enabled": True, "ban_dm_enabled": True,
+            "youtube_enabled": True, "tiktok_enabled": True, "twitch_enabled": False,
             "greeting_mode": "once", "greeting_trigger": "sziasztok",
+            "youtube_handle": None, "tiktok_handle": "@masked_sparkle", "twitch_handle": None,
         }
         for k, v in defaults.items():
             if k not in self.guild_config[gid]:
@@ -132,7 +182,7 @@ class Jasmine(commands.Bot):
         return None
 
     async def setup_hook(self):
-        print("🔧 Jasmine FULL + BRIDGE setup_hook...")
+        print("🔧 Jasmine FULL + BRIDGE + HANDLE setup_hook...")
 
         @self.tree.command(name="setwelcome", description="Üdvözlő csatorna")
         @app_commands.describe(channel="Csatorna")
@@ -156,28 +206,59 @@ class Jasmine(commands.Bot):
             save_config(self.guild_config)
             await interaction.followup.send(f"✅ Leave: {channel.mention}", ephemeral=True)
 
-        @self.tree.command(name="setyoutube", description="YouTube csatorna")
-        @app_commands.describe(channel="Csatorna", channel_id="YT Channel ID")
-        async def setyoutube(interaction: discord.Interaction, channel: discord.TextChannel, channel_id: str = None):
+        @self.tree.command(name="setyoutube", description="YouTube beállítás @ handle-lel pl @TheOneCassidy")
+        @app_commands.describe(channel="Melyik Discord csatornába posztoljon", handle="YouTube handle pl @TheOneCassidy vagy channel ID")
+        async def setyoutube(interaction: discord.Interaction, channel: discord.TextChannel, handle: str):
             await interaction.response.defer(ephemeral=True)
             if not interaction.user.guild_permissions.administrator:
                 await interaction.followup.send("❌ Nincs jogod!", ephemeral=True); return
             cfg = self.get_guild_config(interaction.guild.id)
+            
+            
+            resolved_id, resolved_handle = resolve_youtube_handle(handle)
+            
             cfg["youtube_channel"] = channel.id
-            if channel_id: cfg["youtube_channel_id"] = channel_id
+            cfg["youtube_handle"] = resolved_handle or handle
+            if resolved_id:
+                cfg["youtube_channel_id"] = resolved_id
+            else:
+                
+                cfg["youtube_channel_id"] = handle
+            
             save_config(self.guild_config)
-            await interaction.followup.send(f"✅ YouTube: {channel.mention}", ephemeral=True)
+            
+            if resolved_id:
+                await interaction.followup.send(f"✅ YouTube: {channel.mention} | Handle: `{resolved_handle}` | ID: `{resolved_id}` feloldva!", ephemeral=True)
+            else:
+                await interaction.followup.send(f"⚠️ YouTube: {channel.mention} | Handle: `{handle}` elmentve, de ID-t nem tudtam feloldani. Próbálom így is figyelni.", ephemeral=True)
 
-        @self.tree.command(name="settiktok", description="TikTok csatorna")
-        @app_commands.describe(channel="Csatorna")
-        async def settiktok(interaction: discord.Interaction, channel: discord.TextChannel):
+        @self.tree.command(name="settiktok", description="TikTok @ handle-lel")
+        @app_commands.describe(channel="Csatorna", handle="TikTok handle pl @masked_sparkle")
+        async def settiktok(interaction: discord.Interaction, channel: discord.TextChannel, handle: str = None):
             await interaction.response.defer(ephemeral=True)
             if not interaction.user.guild_permissions.administrator:
                 await interaction.followup.send("❌ Nincs jogod!", ephemeral=True); return
             cfg = self.get_guild_config(interaction.guild.id)
             cfg["tiktok_channel"] = channel.id
+            if handle:
+                if not handle.startswith("@"): handle = "@" + handle
+                cfg["tiktok_handle"] = handle
+                cfg["tiktok_rss"] = f"https://www.tiktok.com/{handle}/rss"
             save_config(self.guild_config)
-            await interaction.followup.send(f"✅ TikTok: {channel.mention}", ephemeral=True)
+            await interaction.followup.send(f"✅ TikTok: {channel.mention} | Handle: `{cfg.get('tiktok_handle')}`", ephemeral=True)
+
+        @self.tree.command(name="settwitch", description="Twitch @ handle-lel")
+        @app_commands.describe(channel="Csatorna", handle="Twitch név pl theonecassidy")
+        async def settwitch(interaction: discord.Interaction, channel: discord.TextChannel, handle: str):
+            await interaction.response.defer(ephemeral=True)
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.followup.send("❌ Nincs jogod!", ephemeral=True); return
+            cfg = self.get_guild_config(interaction.guild.id)
+            cfg["twitch_channel"] = channel.id
+            cfg["twitch_handle"] = handle.replace("@","")
+            cfg["twitch_enabled"] = True
+            save_config(self.guild_config)
+            await interaction.followup.send(f"✅ Twitch: {channel.mention} | Handle: `{handle}`", ephemeral=True)
 
         @self.tree.command(name="setstream", description="Stream csatorna")
         @app_commands.describe(channel="Csatorna")
@@ -270,6 +351,7 @@ class Jasmine(commands.Bot):
             save_config(self.guild_config)
             await interaction.followup.send(f"✅ Greeting:\n```{message}```", ephemeral=True)
 
+        # TOGGLE-OK MINT KAMILÁNÁL
         @self.tree.command(name="togglewelcome", description="Welcome ki/be")
         @app_commands.choices(state=[app_commands.Choice(name="Be", value="on"), app_commands.Choice(name="Ki", value="off")])
         async def togglewelcome(interaction: discord.Interaction, state: str):
@@ -318,7 +400,34 @@ class Jasmine(commands.Bot):
             cfg = self.get_guild_config(interaction.guild.id)
             cfg["ban_dm_enabled"] = state == "on"
             save_config(self.guild_config)
-            await interaction.followup.send(f"✅ BAN DM utolsó pillanat: {'BE' if cfg['ban_dm_enabled'] else 'KI'} | Ha Kamila bannol, Jasmine DM-et küld!", ephemeral=True)
+            await interaction.followup.send(f"✅ BAN DM utolsó pillanat: {'BE' if cfg['ban_dm_enabled'] else 'KI'}", ephemeral=True)
+
+        @self.tree.command(name="jasminetoggle", description="Bármelyik modul ki/be - mint Kamilánál")
+        @app_commands.describe(modul="Mit kapcsolsz", state="Állapot")
+        @app_commands.choices(
+            modul=[
+                app_commands.Choice(name="Welcome", value="welcome_enabled"),
+                app_commands.Choice(name="Leave", value="leave_enabled"),
+                app_commands.Choice(name="DM", value="dm_enabled"),
+                app_commands.Choice(name="BAN DM", value="ban_dm_enabled"),
+                app_commands.Choice(name="Greeting", value="greeting_enabled"),
+                app_commands.Choice(name="YouTube Értesítő", value="youtube_enabled"),
+                app_commands.Choice(name="TikTok Értesítő", value="tiktok_enabled"),
+                app_commands.Choice(name="Twitch Értesítő", value="twitch_enabled"),
+            ],
+            state=[
+                app_commands.Choice(name="Be", value="on"),
+                app_commands.Choice(name="Ki", value="off"),
+            ]
+        )
+        async def jasminetoggle(interaction: discord.Interaction, modul: str, state: str):
+            await interaction.response.defer(ephemeral=True)
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.followup.send("❌ Nincs jogod!", ephemeral=True); return
+            cfg = self.get_guild_config(interaction.guild.id)
+            cfg[modul] = state == "on"
+            save_config(self.guild_config)
+            await interaction.followup.send(f"✅ {modul} -> {'BE 🟢' if state=='on' else 'KI 🔴'}", ephemeral=True)
 
         @self.tree.command(name="testbandm", description="TESZT - BAN DM utolsó pillanat")
         @app_commands.describe(member="Kinek küldje a teszt DM-et")
@@ -338,35 +447,47 @@ class Jasmine(commands.Bot):
             try:
                 await member.send(embed=embed)
                 await interaction.followup.send(f"✅ TESZT DM elküldve neki: {member.mention}", ephemeral=True)
-                print(f"✅ TEST BAN DM OK: {member.name}")
             except discord.Forbidden:
                 await interaction.followup.send(f"❌ {member.mention} letiltotta a DM-et!", ephemeral=True)
             except Exception as e:
                 await interaction.followup.send(f"❌ Hiba: {e}", ephemeral=True)
 
-        @self.tree.command(name="jasmineconfig", description="Összes beállítás - FULL + Bridge")
+        @self.tree.command(name="jasmineconfig", description="Összes beállítás - FULL - mi BE mi KI")
         async def jasmineconfig(interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
             cfg = self.get_guild_config(interaction.guild.id)
-            embed = discord.Embed(title=f"🌸 Jasmine FULL Config - {interaction.guild.name}", color=discord.Color.pink())
             def ch_mention(cid):
                 if not cid: return "Nincs"
                 ch = interaction.guild.get_channel(cid)
                 return ch.mention if ch else f"ID:{cid}"
-            embed.add_field(name="Welcome", value=f"{ch_mention(cfg.get('welcome_channel'))} | {'BE' if cfg.get('welcome_enabled') else 'KI'}", inline=False)
-            embed.add_field(name="Welcome msg", value=f"```{cfg.get('welcome_message')[:800]}```", inline=False)
-            embed.add_field(name="Leave", value=f"{ch_mention(cfg.get('leave_channel'))} | {'BE' if cfg.get('leave_enabled') else 'KI'}", inline=False)
-            embed.add_field(name="DM", value=f"{'BE' if cfg.get('dm_enabled') else 'KI'}", inline=True)
-            embed.add_field(name="BAN DM utolsó pillanat", value=f"{'BE ✅' if cfg.get('ban_dm_enabled') else 'KI ❌'} | Bridge: Discord csatornán", inline=False)
-            embed.add_field(name="BAN msg", value=f"```{cfg.get('ban_message')[:800]}```", inline=False)
-            embed.add_field(name="KICK msg", value=f"```{cfg.get('kick_message')[:500]}```", inline=False)
-            embed.add_field(name="Greeting", value=f"`{cfg.get('greeting_trigger')}` | {cfg.get('greeting_mode')} | {'BE' if cfg.get('greeting_enabled') else 'KI'}", inline=False)
-            embed.add_field(name="YouTube/TikTok/Stream", value=f"YT:{ch_mention(cfg.get('youtube_channel'))} | TT:{ch_mention(cfg.get('tiktok_channel'))} | Stream:{ch_mention(cfg.get('stream_channel'))}", inline=False)
+            def status(val): return "🟢 BE" if val else "🔴 KI"
+
+            embed = discord.Embed(title=f"🌸 Jasmine FULL Config - {interaction.guild.name}", color=discord.Color.pink(), timestamp=datetime.datetime.now())
+            
+            embed.add_field(name="👋 Welcome", value=f"{ch_mention(cfg.get('welcome_channel'))} | {status(cfg.get('welcome_enabled'))}", inline=False)
+            embed.add_field(name="🥀 Leave", value=f"{ch_mention(cfg.get('leave_channel'))} | {status(cfg.get('leave_enabled'))}", inline=False)
+            embed.add_field(name="💌 DM Welcome", value=f"{status(cfg.get('dm_enabled'))}", inline=True)
+            embed.add_field(name="🚫 BAN DM Last Moment", value=f"{status(cfg.get('ban_dm_enabled'))} | Bridge: Discord", inline=True)
+            embed.add_field(name="💬 Greeting", value=f"`{cfg.get('greeting_trigger')}` | {cfg.get('greeting_mode')} | {status(cfg.get('greeting_enabled'))}", inline=False)
+            
+            # Social értesítők új handle rendszerrel
+            yt_handle = cfg.get('youtube_handle') or cfg.get('youtube_channel_id') or "Nincs"
+            tt_handle = cfg.get('tiktok_handle') or "Nincs"
+            tw_handle = cfg.get('twitch_handle') or "Nincs"
+            
+            embed.add_field(name="🔴 YouTube", value=f"Handle: `{yt_handle}`\nID: `{cfg.get('youtube_channel_id','Nincs')}`\nCsati: {ch_mention(cfg.get('youtube_channel'))} | {status(cfg.get('youtube_enabled'))}", inline=False)
+            embed.add_field(name="📱 TikTok", value=f"Handle: `{tt_handle}`\nCsati: {ch_mention(cfg.get('tiktok_channel'))} | {status(cfg.get('tiktok_enabled'))}", inline=True)
+            embed.add_field(name="🟣 Twitch", value=f"Handle: `{tw_handle}`\nCsati: {ch_mention(cfg.get('twitch_channel'))} | {status(cfg.get('twitch_enabled'))}", inline=True)
+            
+            embed.add_field(name="📝 Üzenetek (custom)", value=f"Welcome: {len(cfg.get('welcome_message',''))} char | Leave: {len(cfg.get('leave_message',''))} char | BAN: {len(cfg.get('ban_message',''))} char", inline=False)
+            embed.add_field(name="⚙️ Toggle parancs", value="`/jasminetoggle` - minden modul ki/be\n`/setyoutube #csati @TheOneCassidy` - YT handle\n`/settiktok #csati @...` - TT handle", inline=False)
+            embed.set_footer(text=f"Jasmine FULL | {interaction.guild.name} | Handle resolver aktív")
+
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         @self.tree.command(name="ping", description="Teszt")
         async def ping(interaction: discord.Interaction):
-            await interaction.response.send_message("🌸 Jasmine Pong! FULL + BRIDGE működik! ✅", ephemeral=True)
+            await interaction.response.send_message("🌸 Jasmine Pong! FULL + HANDLE + BRIDGE ✅", ephemeral=True)
 
         # Platform commands
         @self.tree.command(name="stream", description="Stream élő")
@@ -407,20 +528,20 @@ class Jasmine(commands.Bot):
 
         try:
             synced = await self.tree.sync()
-            print(f"✅ Jasmine FULL+BRIDGE sync: {len(synced)} -> {', '.join([c.name for c in synced])}")
+            print(f"✅ Jasmine FULL+BRIDGE+HANDLE sync: {len(synced)}")
         except Exception as e:
             print(f"❌ Sync hiba: {e}\n{traceback.format_exc()}")
 
         self.check_platforms.start()
 
     async def on_ready(self):
-        print(f"✨ Jasmine FULL+BRIDGE {self.user} | {len(self.guilds)} szerveren - BAN DM LAST MOMENT")
+        print(f"✨ Jasmine FULL+BRIDGE+HANDLE {self.user} | {len(self.guilds)} szerveren")
         for guild in self.guilds:
             try: await self.tree.sync(guild=guild)
             except: pass
 
     async def on_message(self, message):
-        # DISCORD BRIDGE - Kamila jele - FONTOS!
+        # DISCORD BRIDGE - Kamila jele
         if message.author.bot and message.content.startswith("BRIDGE_BAN|"):
             try:
                 parts = message.content.split("|")
@@ -439,26 +560,20 @@ class Jasmine(commands.Bot):
                 if not cfg.get("ban_dm_enabled"): return
                 member = guild.get_member(user_id)
                 if not member:
-                    print(f"🌉 BRIDGE: {user_id} már nincs szerveren (túl késő)")
                     return
-                print(f"🌉 BRIDGE érkezett! {member.name} -> {guild.name} | {reason} | LAST MOMENT DM!")
                 tmpl = cfg.get("ban_message")
                 text = format_message(tmpl, member=member, guild=guild, reason=reason)
                 embed = discord.Embed(title="🚫 Bannolva leszel - utolsó pillanat!", description=text, color=discord.Color.red())
                 embed.add_field(name="Szerver", value=guild.name, inline=True)
                 embed.add_field(name="Indok", value=reason[:1000], inline=False)
                 embed.add_field(name="Bannolta", value=banned_by, inline=True)
-                embed.set_footer(text=f"{guild.name} | Jasmine utolsó pillanat 🌸 | Most fogsz kikerülni!")
+                embed.set_footer(text=f"{guild.name} | Jasmine utolsó pillanat 🌸")
                 if guild.icon: embed.set_thumbnail(url=guild.icon.url)
                 try:
                     await member.send(embed=embed)
-                    print(f"✅ 🌉 LAST MOMENT DM: {member.name} | Még szerveren volt!")
                     try: await message.delete()
                     except: pass
-                except discord.Forbidden:
-                    print(f"❌ 🌉 DM FORBIDDEN: {member.name}")
-                except Exception as e:
-                    print(f"❌ 🌉 DM hiba: {e}")
+                except: pass
             except Exception as e:
                 print(f"BRIDGE hiba: {e}")
             return
@@ -477,7 +592,6 @@ class Jasmine(commands.Bot):
                 embed = discord.Embed(title="👢 Kickelve leszel!", description=text, color=discord.Color.orange())
                 try:
                     await member.send(embed=embed)
-                    print(f"✅ 🌉 KICK DM: {member.name}")
                     await message.delete()
                 except: pass
             except: pass
@@ -506,12 +620,10 @@ class Jasmine(commands.Bot):
         await self.process_commands(message)
 
     async def on_member_ban(self, guild, user):
-        print(f"🔨 [BAN BACKUP] {user.name} bannolva {guild.name}-en")
         cfg = self.get_guild_config(guild.id)
         if not cfg.get("ban_dm_enabled"): return
         key = f"{guild.id}_{user.id}"
         if key in self.last_bridge and time.time() - self.last_bridge[key] < 15:
-            print(f"   -> Már küldtem bridge-en, backup nem kell")
             return
         reason = "Kamila biztonsági rendszer"
         banned_by_name = "Ismeretlen"
@@ -526,34 +638,14 @@ class Jasmine(commands.Bot):
         text = format_message(tmpl, user=user, guild=guild, reason=reason)
         embed = discord.Embed(title="🚫 Bannolva lettél!", description=text, color=discord.Color.red())
         embed.add_field(name="Indok", value=reason[:1000], inline=False)
-        embed.add_field(name="Bannolta", value=banned_by_name, inline=True)
         embed.set_footer(text=f"{guild.name} | Jasmine 🌸")
         if guild.icon: embed.set_thumbnail(url=guild.icon.url)
         try:
             await user.send(embed=embed)
-            print(f"   ✅ BACKUP BAN DM: {user.name}")
-        except:
-            print(f"   ❌ BACKUP nem ment (már nincs szerveren)")
+        except: pass
 
     async def on_member_remove(self, member):
         cfg = self.get_guild_config(member.guild.id)
-        is_kick = False
-        kick_reason = "3 figyelmeztetés / szabályszegés"
-        try:
-            async for entry in member.guild.audit_logs(limit=5, action=discord.AuditLogAction.kick):
-                if entry.target.id == member.id:
-                    is_kick = True
-                    kick_reason = entry.reason or "Kamila kick"
-                    break
-        except: pass
-        if is_kick and cfg.get("ban_dm_enabled"):
-            tmpl = cfg.get("kick_message")
-            text = format_message(tmpl, member=member, guild=member.guild, reason=kick_reason)
-            embed = discord.Embed(title="👢 Kickelve lettél!", description=text, color=discord.Color.orange())
-            try:
-                await member.send(embed=embed)
-                print(f"✅ KICK DM: {member.name}")
-            except: pass
         if not cfg.get("leave_enabled", True): return
         channel_id = cfg.get("leave_channel") or cfg.get("welcome_channel")
         channel = member.guild.get_channel(channel_id) if channel_id else None
@@ -603,8 +695,23 @@ class Jasmine(commands.Bot):
         await self.wait_until_ready()
     async def check_youtube_for_guild(self, guild):
         cfg = self.get_guild_config(guild.id)
+        if not cfg.get("youtube_enabled", True): return
         pdata = self.get_guild_platform_data(guild.id)
-        channel_id = cfg.get("youtube_channel_id", "UCcKLZHpGu8yp8nQi17lwmmg")
+        channel_id = cfg.get("youtube_channel_id")
+        handle = cfg.get("youtube_handle")
+
+       
+        if not channel_id or (channel_id.startswith("@") and not channel_id.startswith("UC")):
+            resolved_id, _ = resolve_youtube_handle(handle or channel_id)
+            if resolved_id:
+                channel_id = resolved_id
+                cfg["youtube_channel_id"] = resolved_id
+                save_config(self.guild_config)
+
+        if not channel_id or not channel_id.startswith("UC"):
+            
+            return
+
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         try:
             feed = feedparser.parse(rss_url)
@@ -622,13 +729,19 @@ class Jasmine(commands.Bot):
                             if ch.permissions_for(guild.me).send_messages:
                                 target = ch; break
                     if target:
-                        embed = discord.Embed(title="🔴 Új YouTube Videó!", description=f"**{latest.title}**\n{latest.link}", color=discord.Color.red())
+                        embed = discord.Embed(title="🔴 Új YouTube Videó!", description=f"**{latest.title}**\n{latest.link}\nCsatorna: {handle or channel_id}", color=discord.Color.red())
                         await target.send(content="@everyone Új YouTube videó! 🎬", embed=embed)
-        except: pass
+        except Exception as e:
+            print(f"YT check hiba: {e}")
+            pass
     async def check_tiktok_for_guild(self, guild):
         cfg = self.get_guild_config(guild.id)
+        if not cfg.get("tiktok_enabled", True): return
         pdata = self.get_guild_platform_data(guild.id)
         rss = cfg.get("tiktok_rss")
+        if not rss and cfg.get("tiktok_handle"):
+            handle = cfg.get("tiktok_handle")
+            rss = f"https://www.tiktok.com/{handle}/rss"
         try:
             feed = feedparser.parse(rss)
             if feed.entries:
